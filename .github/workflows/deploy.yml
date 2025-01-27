@@ -20,7 +20,9 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
       env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}  # Ensure the region is provided
+        AWS_REGION: ${{ secrets.AWS_REGION }}  # Ensure region is passed from secrets
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Ensure access key is passed from secrets
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Ensure secret access key is passed from secrets
 
     # Build and Push Docker Image to ECR
     - name: Build and Push Docker Image
@@ -42,7 +44,7 @@ jobs:
           --cluster $ECS_CLUSTER_NAME \
           --service $ECS_SERVICE_NAME \
           --force-new-deployment \
-          --region $AWS_REGION  # Pass the region for ECS deployment
+          --region $AWS_REGION  # Ensure the region is passed in ECS deployment
       env:
         AWS_REGION: ${{ secrets.AWS_REGION }}
         ECS_CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
