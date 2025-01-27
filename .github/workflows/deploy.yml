@@ -1,25 +1,46 @@
-# Use the official Python image as a base image
-FROM python:3.10-slim
+name: Deploy Flask App to ECS
 
-# Set the working directory in the container
-WORKDIR /app
+on:
+  push:
+    branches:
+      - main
 
-# Copy the requirements file
-COPY requirements.txt .
+jobs:
+  deploy:
+    name: Build, Push, and Deploy to ECS
+    runs-on: ubuntu-latest
 
-# Install the required dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+    steps:
+    # Checkout the code
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-# Copy the rest of the application code
-COPY . .
+    # Log in to Amazon ECR
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
 
-# Expose the port the app runs on
-EXPOSE 5000
+    # Build and Push Docker Image to ECR
+    - name: Build and Push Docker Image
+      run: |
+        IMAGE_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY
+        docker build -t $IMAGE_URI .
+        docker push $IMAGE_URI
+      env:
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+        ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
 
-# Set the environment variables for Flask
-ENV FLASK_APP=app.py
-ENV FLASK_RUN_HOST=0.0.0.0
-ENV FLASK_ENV=production
-
-# Command to run the Flask application
-CMD ["flask", "run"]
+    # Deploy to ECS
+    - name: Deploy to Amazon ECS
+      run: |
+        aws ecs update-service \
+          --cluster $ECS_CLUSTER_NAME \
+          --service $ECS_SERVICE_NAME \
+          --force-new-deployment
+      env:
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        ECS_CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
+        ECS_SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
