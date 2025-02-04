@@ -70,7 +70,8 @@ jobs:
         aws ecs wait services-stable \
           --cluster $ECS_CLUSTER_NAME \
           --services $ECS_SERVICE_NAME \
-          --region $AWS_REGION
+          --region ${{ secrets.AWS_REGION }}
+
 
     # Curl the ELB DNS to View Output
     - name: Test Flask Application via ALB
