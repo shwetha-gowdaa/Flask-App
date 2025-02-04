@@ -20,9 +20,9 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
       env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}  # Ensure region is passed from secrets
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}  # Ensure access key is passed from secrets
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}  # Ensure secret access key is passed from secrets
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
     # Build and Push Docker Image to ECR
     - name: Build and Push Docker Image
@@ -37,17 +37,43 @@ jobs:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-    # Deploy to ECS
-    - name: Deploy to Amazon ECS
+    # Update ECS Service and Associate with ALB
+    - name: Deploy to Amazon ECS with ALB
       run: |
         aws ecs update-service \
           --cluster $ECS_CLUSTER_NAME \
           --service $ECS_SERVICE_NAME \
           --force-new-deployment \
-          --region $AWS_REGION  # Ensure the region is passed in ECS deployment
+          --region $AWS_REGION
+
+        # Update Target Group (ntu-target-group) to ensure ECS tasks are registered
+        TASK_ARN=$(aws ecs list-tasks --cluster $ECS_CLUSTER_NAME --service-name $ECS_SERVICE_NAME --query "taskArns[0]" --output text)
+        TASK_IP=$(aws ecs describe-tasks --cluster $ECS_CLUSTER_NAME --tasks $TASK_ARN --query "tasks[0].containers[0].networkInterfaces[0].privateIpv4Address" --output text)
+
+        aws elbv2 register-targets \
+          --target-group-arn $TARGET_GROUP_ARN \
+          --targets Id=$TASK_IP,Port=5000
+
       env:
         AWS_REGION: ${{ secrets.AWS_REGION }}
         ECS_CLUSTER_NAME: ${{ secrets.ECS_CLUSTER_NAME }}
         ECS_SERVICE_NAME: ${{ secrets.ECS_SERVICE_NAME }}
+        TARGET_GROUP_ARN: ${{ secrets.TARGET_GROUP_ARN }}
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+    # Wait for service to stabilize
+    - name: Wait for ECS Service to Stabilize
+      run: |
+        echo "Waiting for ECS service to stabilize..."
+        sleep 30  # Wait for deployment
+        aws ecs wait services-stable \
+          --cluster $ECS_CLUSTER_NAME \
+          --services $ECS_SERVICE_NAME \
+          --region $AWS_REGION
+
+    # Curl the ELB DNS to View Output
+    - name: Test Flask Application via ALB
+      run: |
+        echo "Checking Application Response from ALB..."
+        curl -v http://ntu-load-balancer-432495730.ap-southeast-1.elb.amazonaws.com
