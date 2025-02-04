@@ -46,7 +46,7 @@ jobs:
           --force-new-deployment \
           --region $AWS_REGION
 
-        # Update Target Group (ntu-target-group) to ensure ECS tasks are registered
+      
         TASK_ARN=$(aws ecs list-tasks --cluster $ECS_CLUSTER_NAME --service-name $ECS_SERVICE_NAME --query "taskArns[0]" --output text)
         TASK_IP=$(aws ecs describe-tasks --cluster $ECS_CLUSTER_NAME --tasks $TASK_ARN --query "tasks[0].containers[0].networkInterfaces[0].privateIpv4Address" --output text)
 
