@@ -66,7 +66,7 @@ jobs:
     - name: Wait for ECS Service to Stabilize
       run: |
         echo "Waiting for ECS service to stabilize..."
-        sleep 30  # Wait for deployment
+        sleep 30  
         aws ecs wait services-stable \
           --cluster $ECS_CLUSTER_NAME \
           --services $ECS_SERVICE_NAME \
